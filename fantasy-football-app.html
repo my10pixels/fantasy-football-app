@@ -1,0 +1,1610 @@
+    <script>
+        // Global variables
+        let players = [];
+        let filteredPlayers = [];
+        let csvContent = '';
+        let debugMode = false;
+        
+        // Roster tracking with your league format
+        let myRoster = {
+            QB: [], RB: [], WR: [], TE: [], FLEX: [], K: [], DST: [], BENCH: [],
+            limits: {QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 2, K: 1, DST: 1, BENCH: 7},
+            totalRosterSize: 16 // 9 starters + 7 bench
+        };
+        
+        // Bye week tracking
+        let byeWeekCounts = {};
+        
+        // Known handcuff relationships
+        const handcuffData = {
+            "Bijan Robinson": "Tyler Allgeier",
+            "Jahmyr Gibbs": "David Montgomery",
+            "Josh Jacobs": "AJ Dillon",
+            "Alvin Kamara": "Jamaal Williams",
+            "Kenneth Walker III": "Zach Charbonnet",
+            "Tony Pollard": "Tyjae Spears",
+            "Rachaad White": "Bucky Irving",
+            "Kyren Williams": "Blake Corum",
+            "Breece Hall": "Braelon Allen",
+            "De'Von Achane": "Raheem Mostert",
+            "Joe Mixon": "Dameon Pierce",
+            "Christian McCaffrey": "Jordan Mason",
+            "Saquon Barkley": "Kenneth Gainwell"
+        };
+
+        // Debug logging function
+        function debugLog(message) {
+            console.log(message);
+            if (debugMode) {
+                const debugDiv = document.getElementById('debugLog');
+                const timestamp = new Date().toLocaleTimeString();
+                debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            debugLog('Page loaded, initializing...');
+            
+            // Set up file input change handler
+            document.getElementById('csvFile').addEventListener('change', function(e) {
+                const fileName = e.target.files[0]?.name || 'No file selected';
+                document.getElementById('fileName').textContent = fileName;
+                debugLog(`File selected: ${fileName}`);
+            });
+            
+            updateStats();
+            updateRosterTracker();
+            updateByeWeekTracker();
+            updateDraftAssistant();
+            debugLog('Initial setup complete');
+        });
+
+        // Process CSV button click
+        function processCSV() {
+            debugLog('Process CSV button clicked');
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a CSV file first');
+                debugLog('No file selected');
+                return;
+            }
+            
+            debugLog(`Processing file: ${file.name}`);
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                debugLog('File read complete');
+                csvContent = e.target.result;
+                debugLog(`File size: ${csvContent.length} characters`);
+                parseCSV();
+            };
+            
+            reader.onerror = function(e) {
+                debugLog(`Error reading file: ${e}`);
+                alert('Error reading file');
+            };
+            
+            reader.readAsText(file);
+        }
+
+        // Parse CSV content
+        function parseCSV() {
+            debugLog('Starting CSV parse...');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            try {
+                const lines = csvContent.split(/\r?\n/);
+                debugLog(`Found ${lines.length} lines in CSV`);
+                
+                // Skip header
+                const dataLines = lines.slice(1).filter(line => line.trim());
+                debugLog(`Processing ${dataLines.length} data lines`);
+                
+                players = [];
+                
+                dataLines.forEach((line, index) => {
+                    // Simple CSV parsing - split by comma
+                    const columns = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+                    
+                    if (columns.length >= 15 && columns[2]) {
+                        const playerName = columns[2];
+                        
+                        // Extract position
+                        let position = columns[4] || "WR";
+                        if (position.includes("WR")) position = "WR";
+                        else if (position.includes("RB")) position = "RB";
+                        else if (position.includes("QB")) position = "QB";
+                        else if (position.includes("TE")) position = "TE";
+                        else if (position.includes("K")) position = "K";
+                        else if (position.includes("DST") || position.includes("DEF")) position = "DST";
+                        
+                        const player = {
+                            rank: parseInt(columns[0]) || (index + 1),
+                            tier: parseInt(columns[1]) || Math.min(8, Math.ceil((index + 1) / 75)),
+                            name: playerName,
+                            position: position,
+                            team: columns[3] || "UNK",
+                            bye: parseInt(columns[5]) || 10,
+                            rushYds: parseInt(columns[13]) || 0,
+                            rushTD: parseInt(columns[14]) || 0,
+                            recYds: parseInt(columns[10]) || 0,
+                            recTD: parseInt(columns[11]) || 0,
+                            receptions: parseInt(columns[9]) || 0,
+                            passYds: parseInt(columns[7]) || 0,
+                            passTD: parseInt(columns[8]) || 0,
+                            drafted: false,
+                            draftedByMe: false,
+                            handcuff: handcuffData[playerName] || null
+                        };
+                        
+                        players.push(player);
+                    }
+                });
+                
+                debugLog(`Successfully parsed ${players.length} players`);
+                
+                if (players.length > 0) {
+                    statusDiv.innerHTML = `<div class="upload-status upload-success">✅ Successfully loaded ${players.length} players!</div>`;
+                    initializeApp();
+                } else {
+                    throw new Error('No players found in CSV');
+                }
+                
+            } catch (error) {
+                debugLog(`Error parsing CSV: ${error.message}`);
+                statusDiv.innerHTML = `<div class="upload-status upload-error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize app after loading players
+        function initializeApp() {
+            debugLog('Initializing app...');
+            filteredPlayers = [...players];
+            populateTeamFilter();
+            renderTable();
+            updateStats();
+            updateRosterTracker();
+            updateByeWeekTracker();
+            updateDraftAssistant();
+            debugLog('App initialized successfully');
+        }
+
+        // Populate team filter
+        function populateTeamFilter() {
+            const teams = [...new Set(players.map(p => p.team))].sort();
+            const teamFilter = document.getElementById('teamFilter');
+            
+            // Clear existing options
+            teamFilter.innerHTML = '<option value="all">All Teams</option>';
+            
+            teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                teamFilter.appendChild(option);
+            });
+        }
+
+        // Filter players
+        function filterPlayers() {
+            const posFilter = document.getElementById('positionFilter').value;
+            const teamFilter = document.getElementById('teamFilter').value;
+            const tierFilter = document.getElementById('tierFilter').value;
+            const draftedFilter = document.getElementById('draftedFilter').value;
+            const searchTerm = document.getElementById('playerSearch').value.toLowerCase();
+
+            filteredPlayers = players.filter(player => {
+                const posMatch = posFilter === 'all' || player.position === posFilter;
+                const teamMatch = teamFilter === 'all' || player.team === teamFilter;
+                const tierMatch = tierFilter === 'all' || player.tier.toString() === tierFilter;
+                const draftedMatch = draftedFilter === 'all' || 
+                    (draftedFilter === 'available' && !player.drafted) ||
+                    (draftedFilter === 'my-team' && player.draftedByMe) ||
+                    (draftedFilter === 'others' && player.drafted && !player.draftedByMe);
+                const searchMatch = searchTerm === '' || 
+                    player.name.toLowerCase().includes(searchTerm);
+
+                return posMatch && teamMatch && tierMatch && draftedMatch && searchMatch;
+            });
+
+            renderTable();
+            updateStats();
+        }
+
+        // Render table
+        function renderTable() {
+            const tbody = document.getElementById('playersBody');
+            tbody.innerHTML = '';
+
+            if (players.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="14" style="text-align: center; padding: 40px;">
+                            Please upload the CSV file to load player data
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filteredPlayers.forEach(player => {
+                const row = document.createElement('tr');
+                row.className = `tier-${player.tier}`;
+                
+                if (player.draftedByMe) {
+                    row.className += ' drafted-by-me';
+                } else if (player.drafted) {
+                    row.className += ' drafted-by-others';
+                }
+
+                const tierColors = {
+                    1: '#ef4444', 2: '#f56565', 3: '#fb923c', 4: '#fbbf24',
+                    5: '#22c55e', 6: '#3b82f6', 7: '#8b5cf6', 8: '#a855f7'
+                };
+                const tierColor = tierColors[player.tier] || '#6b7280';
+                
+                row.innerHTML = `
+                    <td><strong>#${player.rank}</strong></td>
+                    <td><span style="background: ${tierColor}; color: white; padding: 2px 6px; border-radius: 4px;">${player.tier}</span></td>
+                    <td><strong>${player.name}</strong>${player.draftedByMe ? ' 👤' : player.drafted ? ' ❌' : ''}</td>
+                    <td><span class="position pos-${player.position.toLowerCase()}">${player.position}</span></td>
+                    <td>${player.team}</td>
+                    <td>${player.bye}</td>
+                    <td>${player.rushYds || '-'}</td>
+                    <td>${player.rushTD || '-'}</td>
+                    <td>${player.recYds || '-'}</td>
+                    <td>${player.recTD || '-'}</td>
+                    <td>${player.receptions || '-'}</td>
+                    <td>${player.passYds || '-'}</td>
+                    <td>${player.passTD || '-'}</td>
+                    <td>
+                        <button class="draft-btn" onclick="draftToMyTeam(${player.rank})" ${player.drafted ? 'disabled' : ''}>
+                            ${player.draftedByMe ? 'My Pick' : 'Draft Me'}
+                        </button>
+                        <button class="draft-btn draft-others" onclick="draftToOthers(${player.rank})" ${player.drafted ? 'disabled' : ''}>
+                            ${player.drafted && !player.draftedByMe ? 'Taken' : 'Others'}
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Draft to my team with smart roster assignment
+        function draftToMyTeam(rank) {
+            const player = players.find(p => p.rank === rank);
+            if (player && !player.drafted) {
+                player.drafted = true;
+                player.draftedByMe = true;
+                
+                // Smart roster assignment
+                assignPlayerToRoster(player);
+                
+                updateByeWeekCounts();
+                updateRosterTracker();
+                updateByeWeekTracker();
+                updateDraftAssistant();
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Smart roster assignment based on league format
+        function assignPlayerToRoster(player) {
+            const pos = player.position;
+            
+            // Try to fill starting positions first
+            if (pos === 'QB' && myRoster.QB.length < myRoster.limits.QB) {
+                myRoster.QB.push(player);
+            } else if (pos === 'RB' && myRoster.RB.length < myRoster.limits.RB) {
+                myRoster.RB.push(player);
+            } else if (pos === 'WR' && myRoster.WR.length < myRoster.limits.WR) {
+                myRoster.WR.push(player);
+            } else if (pos === 'TE' && myRoster.TE.length < myRoster.limits.TE) {
+                myRoster.TE.push(player);
+            } else if ((pos === 'RB' || pos === 'WR' || pos === 'TE') && myRoster.FLEX.length < myRoster.limits.FLEX) {
+                // FLEX can be RB, WR, or TE
+                myRoster.FLEX.push(player);
+            } else if (pos === 'K' && myRoster.K.length < myRoster.limits.K) {
+                myRoster.K.push(player);
+            } else if (pos === 'DST' && myRoster.DST.length < myRoster.limits.DST) {
+                myRoster.DST.push(player);
+            } else if (myRoster.BENCH.length < myRoster.limits.BENCH) {
+                // If starting spots are filled, add to bench
+                myRoster.BENCH.push(player);
+            } else {
+                // Roster is full, still track the player
+                myRoster.BENCH.push(player);
+            }
+        }
+
+        // Draft to others
+        function draftToOthers(rank) {
+            const player = players.find(p => p.rank === rank);
+            if (player && !player.drafted) {
+                player.drafted = true;
+                player.draftedByMe = false;
+                updateDraftAssistant();
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Remove from roster
+        function removeFromRoster(rank, position) {
+            const player = players.find(p => p.rank === rank);
+            if (player && player.draftedByMe) {
+                player.drafted = false;
+                player.draftedByMe = false;
+                
+                // Remove from the specific roster position
+                myRoster[position] = myRoster[position].filter(p => p.rank !== rank);
+                
+                updateByeWeekCounts();
+                updateRosterTracker();
+                updateByeWeekTracker();
+                updateDraftAssistant();
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Update bye week counts
+        function updateByeWeekCounts() {
+            byeWeekCounts = {};
+            const allMyPlayers = Object.values(myRoster).flat().filter(p => p && p.bye);
+            allMyPlayers.forEach(player => {
+                if (player.bye) {
+                    byeWeekCounts[player.bye] = (byeWeekCounts[player.bye] || 0) + 1;
+                }
+            });
+        }
+
+        // Update roster tracker
+        function updateRosterTracker() {
+            // Update all position counts and rosters
+            ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'BENCH'].forEach(pos => {
+                const roster = myRoster[pos] || [];
+                const limit = myRoster.limits[pos];
+                const countElement = document.getElementById(`${pos.toLowerCase()}-count`);
+                const rosterList = document.getElementById(`${pos.toLowerCase()}-roster`);
+                
+                if (countElement) {
+                    countElement.textContent = roster.length;
+                }
+                
+                if (rosterList) {
+                    rosterList.innerHTML = roster.map(player => `
+                        <div class="roster-player ${pos === 'FLEX' ? 'flex-eligible' : ''}">
+                            <span>${player.name} (${player.team}) - ${player.position}</span>
+                            <button class="remove-btn" onclick="removeFromRoster(${player.rank}, '${pos}')">×</button>
+                        </div>
+                    `).join('');
+                }
+
+                // Update visual status of position boxes
+                const positionElement = rosterList?.parentElement;
+                if (positionElement) {
+                    positionElement.className = 'roster-position';
+                    if (roster.length === limit) {
+                        positionElement.className += ' filled';
+                    } else if (roster.length > limit) {
+                        positionElement.className += ' overfilled';
+                    }
+                    if (pos === 'BENCH') {
+                        positionElement.className += ' bench-section';
+                    }
+                }
+            });
+
+            // Update roster summary
+            const totalRoster = Object.values(myRoster).flat().filter(p => p && p.rank).length;
+            const startersFilled = myRoster.QB.length + myRoster.RB.length + myRoster.WR.length + 
+                                  myRoster.TE.length + myRoster.FLEX.length + myRoster.K.length + myRoster.DST.length;
+
+            document.getElementById('total-roster').textContent = totalRoster;
+            document.getElementById('starters-filled').textContent = Math.min(startersFilled, 9);
+
+            // Update draft strategy recommendation
+            let strategy = "Fill starting lineup first";
+            if (startersFilled >= 9) {
+                strategy = "Focus on bench depth and handcuffs";
+            } else if (startersFilled >= 6) {
+                strategy = "Complete starting lineup";
+            } else if (myRoster.QB.length === 0) {
+                strategy = "QB is critical need";
+            } else if (myRoster.RB.length < 2) {
+                strategy = "Target RB for starting spots";
+            }
+            document.getElementById('draft-strategy').textContent = strategy;
+        }
+
+        // Update bye week tracker
+        function updateByeWeekTracker() {
+            [5, 6, 7, 9, 10, 11, 12, 14].forEach(week => {
+                const count = byeWeekCounts[week] || 0;
+                const element = document.getElementById(`bye-${week}`);
+                if (element) {
+                    element.textContent = count;
+                    element.parentElement.className = count >= 3 ? 'bye-week-item bye-week-heavy' : 'bye-week-item';
+                }
+            });
+
+            const hasHeavyByeWeek = Object.values(byeWeekCounts).some(count => count >= 3);
+            const warningElement = document.getElementById('bye-warning');
+            if (warningElement) {
+                warningElement.style.display = hasHeavyByeWeek ? 'block' : 'none';
+            }
+        }
+
+        // Update draft assistant
+        function updateDraftAssistant() {
+            // Calculate position needs
+            const needs = [];
+            
+            if (myRoster.QB.length < myRoster.limits.QB) {
+                needs.push({pos: 'QB', priority: 9, remaining: myRoster.limits.QB - myRoster.QB.length});
+            }
+            if (myRoster.RB.length < myRoster.limits.RB) {
+                needs.push({pos: 'RB', priority: 10, remaining: myRoster.limits.RB - myRoster.RB.length});
+            }
+            if (myRoster.WR.length < myRoster.limits.WR) {
+                needs.push({pos: 'WR', priority: 8, remaining: myRoster.limits.WR - myRoster.WR.length});
+            }
+            if (myRoster.TE.length < myRoster.limits.TE) {
+                needs.push({pos: 'TE', priority: 7, remaining: myRoster.limits.TE - myRoster.TE.length});
+            }
+            
+            // Check FLEX needs
+            const flexFilled = myRoster.FLEX.length;
+            const flexNeeded = myRoster.limits.FLEX - flexFilled;
+            if (flexNeeded > 0) {
+                needs.push({pos: 'FLEX (RB/WR/TE)', priority: 6, remaining: flexNeeded});
+            }
+            
+            if (myRoster.K.length < myRoster.limits.K) {
+                needs.push({pos: 'K', priority: 2, remaining: myRoster.limits.K - myRoster.K.length});
+            }
+            if (myRoster.DST.length < myRoster.limits.DST) {
+                needs.push({pos: 'DST', priority: 1, remaining: myRoster.limits.DST - myRoster.DST.length});
+            }
+            
+            // Bench depth after starters
+            const totalStarters = myRoster.QB.length + myRoster.RB.length + myRoster.WR.length + 
+                                 myRoster.TE.length + myRoster.FLEX.length + myRoster.K.length + myRoster.DST.length;
+            if (totalStarters >= 9 && myRoster.BENCH.length < myRoster.limits.BENCH) {
+                needs.push({pos: 'BENCH', priority: 3, remaining: myRoster.limits.BENCH - myRoster.BENCH.length});
+            }
+
+            needs.sort((a, b) => b.priority - a.priority);
+
+            const nextNeedElement = document.getElementById('next-need');
+            if (nextNeedElement) {
+                nextNeedElement.textContent = needs.length > 0 ? 
+                    `${needs[0].pos}` : 'Roster complete!';
+            }
+
+            // Find best value pick
+            const availablePlayers = players.filter(p => !p.drafted);
+            let bestValue = null;
+            
+            if (availablePlayers.length > 0) {
+                // Find players who have fallen significantly from their expected position
+                bestValue = availablePlayers.find(p => {
+                    const expectedRank = p.rank;
+                    const currentPick = players.filter(pl => pl.drafted).length + 1;
+                    return currentPick > expectedRank + 10; // Player has fallen 10+ spots
+                }) || availablePlayers[0];
+            }
+
+            const bestValueElement = document.getElementById('best-value');
+            if (bestValueElement) {
+                bestValueElement.textContent = bestValue ? 
+                    `${bestValue.name} (${bestValue.position})` : 'None';
+            }
+
+            // Check for handcuff opportunities
+            const myRBs = [...myRoster.RB, ...myRoster.FLEX.filter(p => p.position === 'RB'), ...myRoster.BENCH.filter(p => p.position === 'RB')];
+            const handcuffOpps = [];
+            
+            myRBs.forEach(rb => {
+                if (rb.handcuff) {
+                    const handcuffPlayer = players.find(p => p.name === rb.handcuff);
+                    if (handcuffPlayer && !handcuffPlayer.drafted) {
+                        handcuffOpps.push(rb.handcuff);
+                    }
+                }
+            });
+
+            const handcuffElement = document.getElementById('handcuff-alert');
+            if (handcuffElement) {
+                handcuffElement.textContent = handcuffOpps.length > 0 ? 
+                    handcuffOpps[0] : 'None';
+            }
+
+            // Check for injury concerns in top available
+            const injuryConcerns = availablePlayers
+                .slice(0, 20)
+                .filter(p => p.tier <= 3)
+                .slice(0, 1);
+
+            const injuryElement = document.getElementById('injury-alert');
+            if (injuryElement) {
+                injuryElement.textContent = injuryConcerns.length > 0 ?
+                    `${injuryConcerns[0].name} (Tier ${injuryConcerns[0].tier})` : 'None';
+            }
+        }
+
+        // Update stats
+        function updateStats() {
+            const total = players.length;
+            const myTeam = players.filter(p => p.draftedByMe).length;
+            const othersDrafted = players.filter(p => p.drafted && !p.draftedByMe).length;
+            const available = total - myTeam - othersDrafted;
+            
+            const nextBest = filteredPlayers.find(p => !p.drafted);
+
+            document.getElementById('totalPlayers').textContent = total;
+            document.getElementById('myTeamPlayers').textContent = myTeam;
+            document.getElementById('othersDrafted').textContent = othersDrafted;
+            document.getElementById('availablePlayers').textContent = available;
+            document.getElementById('topAvailable').textContent = nextBest ? 
+                `${nextBest.name}` : '--';
+        }
+
+        // Export drafted players
+        function exportDrafted() {
+            const myDraftedPlayers = players.filter(p => p.draftedByMe);
+            if (myDraftedPlayers.length === 0) {
+                alert('No players drafted to your team yet!');
+                return;
+            }
+
+            const csvContent = 'Rank,Name,Position,Team,Bye Week\n' + 
+                myDraftedPlayers.map(p => `${p.rank},${p.name},${p.position},${p.team},${p.bye}`).join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'my_fantasy_team.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Reset draft
+        function resetDraft() {
+            if (confirm('Are you sure you want to reset all drafted players?')) {
+                players.forEach(p => {
+                    p.drafted = false;
+                    p.draftedByMe = false;
+                });
+                
+                // Reset roster
+                myRoster = {
+                    QB: [], RB: [], WR: [], TE: [], FLEX: [], K: [], DST: [], BENCH: [],
+                    limits: {QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 2, K: 1, DST: 1, BENCH: 7},
+                    totalRosterSize: 16
+                };
+                
+                byeWeekCounts = {};
+                
+                updateStats();
+                updateRosterTracker();
+                updateByeWeekTracker();
+                updateDraftAssistant();
+                filterPlayers();
+            }
+        }
+
+        // Toggle debug mode
+        function toggleDebug() {
+            debugMode = !debugMode;
+            document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
+            debugLog(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
+        }</script>
+        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Football Half PPR Database</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(30, 41, 59, 0.8);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #334155;
+        }
+
+        .header h1 {
+            color: #10b981;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+
+        select, input[type="text"] {
+            padding: 10px;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            background: #334155;
+            color: #e2e8f0;
+            font-size: 14px;
+            min-width: 120px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .table-container {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            overflow-x: auto;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #f1f5f9;
+            font-size: 0.85rem;
+            border-bottom: 2px solid #475569;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #334155;
+            font-size: 0.85rem;
+        }
+
+        tr:hover {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .tier-1 { background: rgba(239, 68, 68, 0.1); }
+        .tier-2 { background: rgba(245, 101, 101, 0.1); }
+        .tier-3 { background: rgba(251, 146, 60, 0.1); }
+        .tier-4 { background: rgba(251, 191, 36, 0.1); }
+        .tier-5 { background: rgba(34, 197, 94, 0.1); }
+        .tier-6 { background: rgba(59, 130, 246, 0.1); }
+        .tier-7 { background: rgba(139, 92, 246, 0.1); }
+        .tier-8 { background: rgba(168, 85, 247, 0.1); }
+
+        .position {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.75rem;
+        }
+
+        .pos-qb { background: #dc2626; color: white; }
+        .pos-rb { background: #059669; color: white; }
+        .pos-wr { background: #2563eb; color: white; }
+        .pos-te { background: #7c3aed; color: white; }
+        .pos-k { background: #ea580c; color: white; }
+        .pos-dst { background: #0891b2; color: white; }
+
+        .drafted-by-others {
+            opacity: 0.6;
+            background: rgba(200, 100, 100, 0.2) !important;
+        }
+
+        .drafted-by-me {
+            background: rgba(16, 185, 129, 0.2) !important;
+            border-left: 4px solid #10b981;
+        }
+
+        .draft-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin: 2px;
+        }
+
+        .draft-btn.draft-others {
+            background: #ef4444;
+        }
+
+        .draft-btn:hover {
+            opacity: 0.8;
+        }
+
+        .draft-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            background: #059669;
+        }
+
+        .btn-secondary {
+            background: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #334155;
+        }
+
+        .csv-upload-section {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .csv-upload-section h3 {
+            color: #10b981;
+            margin-bottom: 15px;
+        }
+
+        .roster-tracker, .bye-week-optimizer, .draft-assistant {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .roster-tracker h3, .bye-week-optimizer h3, .draft-assistant h3 {
+            color: #10b981;
+            margin-bottom: 15px;
+            font-size: 1.25rem;
+        }
+
+        .roster-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .roster-position {
+            background: rgba(51, 65, 85, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            min-height: 100px;
+        }
+
+        .roster-position h4 {
+            color: #cbd5e1;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .roster-list {
+            min-height: 40px;
+        }
+
+        .roster-player {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10b981;
+            padding: 6px 10px;
+            margin: 4px 0;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .roster-player .remove-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .bench-section {
+            grid-column: 1 / -1;
+            background: rgba(75, 85, 99, 0.3);
+        }
+
+        .roster-summary {
+            display: flex;
+            gap: 20px;
+            padding: 12px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .summary-item {
+            font-size: 0.9rem;
+        }
+
+        .summary-item strong {
+            color: #10b981;
+        }
+
+        .bye-week-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .bye-week-item {
+            background: rgba(51, 65, 85, 0.5);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .bye-week-heavy {
+            background: rgba(239, 68, 68, 0.3) !important;
+            border: 1px solid #ef4444;
+        }
+
+        .bye-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .draft-recommendations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .recommendation-item {
+            background: rgba(51, 65, 85, 0.5);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+        }
+
+        .recommendation-item strong {
+            color: #10b981;
+        }
+
+        .roster-position.filled {
+            border: 2px solid #10b981;
+        }
+
+        .roster-position.overfilled {
+            border: 2px solid #f59e0b;
+        }
+
+        .flex-eligible {
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .file-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .file-input-label {
+            padding: 10px 20px;
+            background: #10b981;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .file-input-label:hover {
+            background: #059669;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .upload-success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            color: #22c55e;
+        }
+
+        .upload-error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+
+        .upload-info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid #3b82f6;
+            color: #60a5fa;
+        }
+
+        #debugInfo {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏈 Fantasy Football Draft Database</h1>
+            <p>Half PPR Scoring • 2025 Season</p>
+        </div>
+
+        <!-- CSV Upload Section -->
+        <div class="csv-upload-section">
+            <h3>📊 Load Player Data</h3>
+            <div class="file-input-wrapper">
+                <label for="csvFile" class="file-input-label">
+                    Choose CSV File
+                </label>
+                <input type="file" id="csvFile" accept=".csv">
+                <span id="fileName">No file selected</span>
+            </div>
+            <button class="btn" onclick="processCSV()">Process CSV</button>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <!-- Debug Info -->
+        <div id="debugInfo" style="display: none;">
+            <strong>Debug Log:</strong>
+            <div id="debugLog"></div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn" onclick="exportDrafted()">📋 Export My Team</button>
+            <button class="btn btn-secondary" onclick="resetDraft()">🔄 Reset Draft</button>
+            <button class="btn btn-secondary" onclick="toggleDebug()">🐛 Toggle Debug</button>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Position Filter:</label>
+                <select id="positionFilter" onchange="filterPlayers()">
+                    <option value="all">All Positions</option>
+                    <option value="QB">QB</option>
+                    <option value="RB">RB</option>
+                    <option value="WR">WR</option>
+                    <option value="TE">TE</option>
+                    <option value="K">K</option>
+                    <option value="DST">DST</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Team Filter:</label>
+                <select id="teamFilter" onchange="filterPlayers()">
+                    <option value="all">All Teams</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Tier Filter:</label>
+                <select id="tierFilter" onchange="filterPlayers()">
+                    <option value="all">All Tiers</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                    <option value="5">Tier 5</option>
+                    <option value="6">Tier 6</option>
+                    <option value="7">Tier 7</option>
+                    <option value="8">Tier 8</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Show Drafted:</label>
+                <select id="draftedFilter" onchange="filterPlayers()">
+                    <option value="all">All Players</option>
+                    <option value="available">Available Only</option>
+                    <option value="my-team">My Team</option>
+                    <option value="others">Drafted by Others</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Search Player:</label>
+                <input type="text" id="playerSearch" placeholder="Player name..." oninput="filterPlayers()">
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-number" id="totalPlayers">0</div>
+                <div class="stat-label">Total Players</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="availablePlayers">0</div>
+                <div class="stat-label">Available</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="myTeamPlayers">0</div>
+                <div class="stat-label">My Team</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="othersDrafted">0</div>
+                <div class="stat-label">Drafted by Others</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="topAvailable">--</div>
+                <div class="stat-label">Next Best Available</div>
+            </div>
+        </div>
+
+        <!-- Roster Tracker -->
+        <div class="roster-tracker">
+            <h3>🏆 My Roster Tracker (1QB/2RB/2WR/1TE/2FLEX/1K/1DST + 7 Bench)</h3>
+            <div class="roster-grid">
+                <div class="roster-position">
+                    <h4>QB (<span id="qb-count">0</span>/1) - Starter</h4>
+                    <div id="qb-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>RB (<span id="rb-count">0</span>/2) - Starters</h4>
+                    <div id="rb-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>WR (<span id="wr-count">0</span>/2) - Starters</h4>
+                    <div id="wr-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>TE (<span id="te-count">0</span>/1) - Starter</h4>
+                    <div id="te-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>FLEX (<span id="flex-count">0</span>/2) - RB/WR/TE</h4>
+                    <div id="flex-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>K (<span id="k-count">0</span>/1) - Starter</h4>
+                    <div id="k-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position">
+                    <h4>DST (<span id="dst-count">0</span>/1) - Starter</h4>
+                    <div id="dst-roster" class="roster-list"></div>
+                </div>
+                <div class="roster-position bench-section">
+                    <h4>BENCH (<span id="bench-count">0</span>/7) - All Positions</h4>
+                    <div id="bench-roster" class="roster-list"></div>
+                </div>
+            </div>
+            
+            <div class="roster-summary">
+                <div class="summary-item">
+                    <strong>Total Roster:</strong> <span id="total-roster">0</span>/16
+                </div>
+                <div class="summary-item">
+                    <strong>Starting Lineup:</strong> <span id="starters-filled">0</span>/9 filled
+                </div>
+                <div class="summary-item">
+                    <strong>Draft Strategy:</strong> <span id="draft-strategy">Fill starting lineup first</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bye Week Optimizer -->
+        <div class="bye-week-optimizer">
+            <h3>📅 Bye Week Optimizer</h3>
+            <div class="bye-week-grid">
+                <div class="bye-week-item">Week 5: <span id="bye-5">0</span></div>
+                <div class="bye-week-item">Week 6: <span id="bye-6">0</span></div>
+                <div class="bye-week-item">Week 7: <span id="bye-7">0</span></div>
+                <div class="bye-week-item">Week 9: <span id="bye-9">0</span></div>
+                <div class="bye-week-item">Week 10: <span id="bye-10">0</span></div>
+                <div class="bye-week-item">Week 11: <span id="bye-11">0</span></div>
+                <div class="bye-week-item">Week 12: <span id="bye-12">0</span></div>
+                <div class="bye-week-item">Week 14: <span id="bye-14">0</span></div>
+            </div>
+            <div class="bye-warning" id="bye-warning">
+                ⚠️ Warning: You have 3+ players with the same bye week!
+            </div>
+        </div>
+
+        <!-- Smart Draft Assistant -->
+        <div class="draft-assistant">
+            <h3>🎯 Smart Draft Assistant</h3>
+            <div class="draft-recommendations">
+                <div class="recommendation-item">
+                    <strong>Next Position Need:</strong> <span id="next-need">RB</span>
+                </div>
+                <div class="recommendation-item">
+                    <strong>Best Value Pick:</strong> <span id="best-value">Loading...</span>
+                </div>
+                <div class="recommendation-item">
+                    <strong>Handcuff Alert:</strong> <span id="handcuff-alert">None</span>
+                </div>
+                <div class="recommendation-item">
+                    <strong>Injury Concerns:</strong> <span id="injury-alert">None</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="playersTable">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Tier</th>
+                        <th>Player</th>
+                        <th>Pos</th>
+                        <th>Team</th>
+                        <th>Bye</th>
+                        <th>Rush Yds</th>
+                        <th>Rush TD</th>
+                        <th>Rec Yds</th>
+                        <th>Rec TD</th>
+                        <th>Rec</th>
+                        <th>Pass Yds</th>
+                        <th>Pass TD</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="playersBody">
+                    <tr>
+                        <td colspan="14" style="text-align: center; padding: 40px;">
+                            Please upload the CSV file to load player data
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let players = [];
+        let filteredPlayers = [];
+        let csvContent = '';
+        let debugMode = false;
+
+        // Debug logging function
+        function debugLog(message) {
+            console.log(message);
+            if (debugMode) {
+                const debugDiv = document.getElementById('debugLog');
+                const timestamp = new Date().toLocaleTimeString();
+                debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            debugLog('Page loaded, initializing...');
+            
+            // Set up file input change handler
+            document.getElementById('csvFile').addEventListener('change', function(e) {
+                const fileName = e.target.files[0]?.name || 'No file selected';
+                document.getElementById('fileName').textContent = fileName;
+                debugLog(`File selected: ${fileName}`);
+            });
+            
+            updateStats();
+            debugLog('Initial setup complete');
+        });
+
+        // Process CSV button click
+        function processCSV() {
+            debugLog('Process CSV button clicked');
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a CSV file first');
+                debugLog('No file selected');
+                return;
+            }
+            
+            debugLog(`Processing file: ${file.name}`);
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                debugLog('File read complete');
+                csvContent = e.target.result;
+                debugLog(`File size: ${csvContent.length} characters`);
+                parseCSV();
+            };
+            
+            reader.onerror = function(e) {
+                debugLog(`Error reading file: ${e}`);
+                alert('Error reading file');
+            };
+            
+            reader.readAsText(file);
+        }
+
+        // Parse CSV content
+        function parseCSV() {
+            debugLog('Starting CSV parse...');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            try {
+                const lines = csvContent.split(/\r?\n/);
+                debugLog(`Found ${lines.length} lines in CSV`);
+                
+                // Skip header
+                const dataLines = lines.slice(1).filter(line => line.trim());
+                debugLog(`Processing ${dataLines.length} data lines`);
+                
+                players = [];
+                
+                dataLines.forEach((line, index) => {
+                    // Simple CSV parsing - split by comma
+                    const columns = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+                    
+                    if (columns.length >= 15 && columns[2]) {
+                        const playerName = columns[2];
+                        
+                        // Extract position
+                        let position = columns[4] || "WR";
+                        if (position.includes("WR")) position = "WR";
+                        else if (position.includes("RB")) position = "RB";
+                        else if (position.includes("QB")) position = "QB";
+                        else if (position.includes("TE")) position = "TE";
+                        else if (position.includes("K")) position = "K";
+                        else if (position.includes("DST") || position.includes("DEF")) position = "DST";
+                        
+                        const player = {
+                            rank: parseInt(columns[0]) || (index + 1),
+                            tier: parseInt(columns[1]) || Math.min(8, Math.ceil((index + 1) / 75)),
+                            name: playerName,
+                            position: position,
+                            team: columns[3] || "UNK",
+                            bye: parseInt(columns[5]) || 10,
+                            rushYds: parseInt(columns[13]) || 0,
+                            rushTD: parseInt(columns[14]) || 0,
+                            recYds: parseInt(columns[10]) || 0,
+                            recTD: parseInt(columns[11]) || 0,
+                            receptions: parseInt(columns[9]) || 0,
+                            passYds: parseInt(columns[7]) || 0,
+                            passTD: parseInt(columns[8]) || 0,
+                            drafted: false,
+                            draftedByMe: false
+                        };
+                        
+                        players.push(player);
+                    }
+                });
+                
+                debugLog(`Successfully parsed ${players.length} players`);
+                
+                if (players.length > 0) {
+                    statusDiv.innerHTML = `<div class="upload-status upload-success">✅ Successfully loaded ${players.length} players!</div>`;
+                    initializeApp();
+                } else {
+                    throw new Error('No players found in CSV');
+                }
+                
+            } catch (error) {
+                debugLog(`Error parsing CSV: ${error.message}`);
+                statusDiv.innerHTML = `<div class="upload-status upload-error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize app after loading players
+        function initializeApp() {
+            debugLog('Initializing app...');
+            filteredPlayers = [...players];
+            populateTeamFilter();
+            renderTable();
+            updateStats();
+            debugLog('App initialized successfully');
+        }
+
+        // Populate team filter
+        function populateTeamFilter() {
+            const teams = [...new Set(players.map(p => p.team))].sort();
+            const teamFilter = document.getElementById('teamFilter');
+            
+            // Clear existing options
+            teamFilter.innerHTML = '<option value="all">All Teams</option>';
+            
+            teams.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                teamFilter.appendChild(option);
+            });
+        }
+
+        // Filter players
+        function filterPlayers() {
+            const posFilter = document.getElementById('positionFilter').value;
+            const teamFilter = document.getElementById('teamFilter').value;
+            const tierFilter = document.getElementById('tierFilter').value;
+            const draftedFilter = document.getElementById('draftedFilter').value;
+            const searchTerm = document.getElementById('playerSearch').value.toLowerCase();
+
+            filteredPlayers = players.filter(player => {
+                const posMatch = posFilter === 'all' || player.position === posFilter;
+                const teamMatch = teamFilter === 'all' || player.team === teamFilter;
+                const tierMatch = tierFilter === 'all' || player.tier.toString() === tierFilter;
+                const draftedMatch = draftedFilter === 'all' || 
+                    (draftedFilter === 'available' && !player.drafted) ||
+                    (draftedFilter === 'my-team' && player.draftedByMe) ||
+                    (draftedFilter === 'others' && player.drafted && !player.draftedByMe);
+                const searchMatch = searchTerm === '' || 
+                    player.name.toLowerCase().includes(searchTerm);
+
+                return posMatch && teamMatch && tierMatch && draftedMatch && searchMatch;
+            });
+
+            renderTable();
+            updateStats();
+        }
+
+        // Render table
+        function renderTable() {
+            const tbody = document.getElementById('playersBody');
+            tbody.innerHTML = '';
+
+            if (players.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="14" style="text-align: center; padding: 40px;">
+                            Please upload the CSV file to load player data
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            filteredPlayers.forEach(player => {
+                const row = document.createElement('tr');
+                row.className = `tier-${player.tier}`;
+                
+                if (player.draftedByMe) {
+                    row.className += ' drafted-by-me';
+                } else if (player.drafted) {
+                    row.className += ' drafted-by-others';
+                }
+
+                const tierColors = {
+                    1: '#ef4444', 2: '#f56565', 3: '#fb923c', 4: '#fbbf24',
+                    5: '#22c55e', 6: '#3b82f6', 7: '#8b5cf6', 8: '#a855f7'
+                };
+                const tierColor = tierColors[player.tier] || '#6b7280';
+                
+                row.innerHTML = `
+                    <td><strong>#${player.rank}</strong></td>
+                    <td><span style="background: ${tierColor}; color: white; padding: 2px 6px; border-radius: 4px;">${player.tier}</span></td>
+                    <td><strong>${player.name}</strong>${player.draftedByMe ? ' 👤' : player.drafted ? ' ❌' : ''}</td>
+                    <td><span class="position pos-${player.position.toLowerCase()}">${player.position}</span></td>
+                    <td>${player.team}</td>
+                    <td>${player.bye}</td>
+                    <td>${player.rushYds || '-'}</td>
+                    <td>${player.rushTD || '-'}</td>
+                    <td>${player.recYds || '-'}</td>
+                    <td>${player.recTD || '-'}</td>
+                    <td>${player.receptions || '-'}</td>
+                    <td>${player.passYds || '-'}</td>
+                    <td>${player.passTD || '-'}</td>
+                    <td>
+                        <button class="draft-btn" onclick="draftToMyTeam(${player.rank})" ${player.drafted ? 'disabled' : ''}>
+                            ${player.draftedByMe ? 'My Pick' : 'Draft Me'}
+                        </button>
+                        <button class="draft-btn draft-others" onclick="draftToOthers(${player.rank})" ${player.drafted ? 'disabled' : ''}>
+                            ${player.drafted && !player.draftedByMe ? 'Taken' : 'Others'}
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Draft to my team
+        function draftToMyTeam(rank) {
+            const player = players.find(p => p.rank === rank);
+            if (player && !player.drafted) {
+                player.drafted = true;
+                player.draftedByMe = true;
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Draft to others
+        function draftToOthers(rank) {
+            const player = players.find(p => p.rank === rank);
+            if (player && !player.drafted) {
+                player.drafted = true;
+                player.draftedByMe = false;
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Update stats
+        function updateStats() {
+            const total = players.length;
+            const myTeam = players.filter(p => p.draftedByMe).length;
+            const othersDrafted = players.filter(p => p.drafted && !p.draftedByMe).length;
+            const available = total - myTeam - othersDrafted;
+            
+            const nextBest = filteredPlayers.find(p => !p.drafted);
+
+            document.getElementById('totalPlayers').textContent = total;
+            document.getElementById('myTeamPlayers').textContent = myTeam;
+            document.getElementById('othersDrafted').textContent = othersDrafted;
+            document.getElementById('availablePlayers').textContent = available;
+            document.getElementById('topAvailable').textContent = nextBest ? 
+                `${nextBest.name}` : '--';
+        }
+
+        // Export drafted players
+        function exportDrafted() {
+            const myDraftedPlayers = players.filter(p => p.draftedByMe);
+            if (myDraftedPlayers.length === 0) {
+                alert('No players drafted to your team yet!');
+                return;
+            }
+
+            const csvContent = 'Rank,Name,Position,Team,Bye Week\n' + 
+                myDraftedPlayers.map(p => `${p.rank},${p.name},${p.position},${p.team},${p.bye}`).join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'my_fantasy_team.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Reset draft
+        function resetDraft() {
+            if (confirm('Are you sure you want to reset all drafted players?')) {
+                players.forEach(p => {
+                    p.drafted = false;
+                    p.draftedByMe = false;
+                });
+                updateStats();
+                filterPlayers();
+            }
+        }
+
+        // Toggle debug mode
+        function toggleDebug() {
+            debugMode = !debugMode;
+            document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
+            debugLog(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
+        }
+    </script>
+</body>
+</html>
