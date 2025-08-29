@@ -51,6 +51,113 @@
             "Jacory Croskey-Merritt": "Austin Ekeler"
         };
 
+        // Injury status tracking - you can update this list as needed
+        const injuryData = {
+            "De'Von Achane": { description: "Calf", status: "Questionable",	returnDate: "9/7/2025"},
+            "Jordan Addison": { description: "Suspension", status: "Reserve-Sus", returnDate: "9/28/2025"},
+            "Nate Adkins": {description: "Ankle", status: "Out", returnDate: "10/5/2025"},
+            "Jamal Agnew": { description: "Oblique", status: "Questionable", returnDate: "9/7/2025"},
+            "Brandon Aiyuk": { description: "Knee- ACL + MCL", status: "PUP-R", returnDate: "10/2/2025"},
+            "Calvin Austin": { description: "Abdomen", status: "Questionable",	returnDate: "9/7/2025"},
+            "Gavin Bartholomew": {	description: "Back", status: "PUP-R", returnDate: "10/5/2025"},
+            "David Bell": { description: "Hip", status: "NFI-R", returnDate: "10/5/2025"},
+            "Jaydon Blue": { description: "Ankle", status: "Questionable", returnDate: "9/4/2025"},
+            "Jake Bobo": { description: "Concussion", status: "Questionable", returnDate: "9/7/2025"},
+            "Jake Briningstool": { description: "Hamstring", status: "IR-R", returnDate: "10/6/2025"},
+            "A.J. Brown": { description: "Hamstring", status: "Questionable", returnDate: "9/4/2025"},
+            "Hollywood Brown": { description: "Ankle", status: "Questionable", returnDate: "9/5/2025"},
+            "Noah Brown": { description: "Undisclosed", status: "Questionable",	returnDate: "9/7/2025"},
+            "Jermaine Burton": { description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Irvin Charles": { description: "Knee - ACL", status: "PUP-R", returnDate: "10/5/2025"},
+            "Efton Chism": {description: "Foot", status: "Questionable", returnDate: "9/7/2025"},
+            "Jacob Cowing": { description: "Hamstring", status: "IR", returnDate: "10/2/2025"},
+            "Andy Dalton": { description: "Elbow", status: "Questionable",	returnDate: "9/7/2025"},
+            "Isaiah Davis": { description: "Ankle", status: "Questionable",	returnDate: "9/7/2025"},
+            "Tank Dell": { description: "Knee - ACL + MCL",	status: "PUP-R", returnDate: "10/5/2025"},
+            "Stefon Diggs": { description: "Knee - ACL", status: "Questionable", returnDate: "9/7/2025"},
+            "Josh Downs": { description: "Hamstring", status: "Questionable", returnDate: "9/7/2025"},
+            "Ashton Dulin": { description: "Concussion", status: "Questionable", returnDate: "9/7/2025"},
+            "Tai Felton": { description: "Arm", status: "Questionable",	returnDate: "9/8/2025"},
+            "Russell Gage": { description: "Knee - MCL", status: "Questionable", returnDate: "9/7/2025"},
+            "Mike Gesicki": { description: "Hamstring", status: "Questionable",	returnDate: "9/7/2025"},
+            "Xavier Gipson": { description: "Shoulder", status: "Questionable",	returnDate: "9/7/2025"},
+            "Chris Godwin": { description: "Ankle", status: "Questionable", returnDate: "9/7/2025"},
+            "Dallas Goedert": { description: "Groin", status: "Questionable", returnDate: "9/4/2025"},
+            "Tyler Goodson": { description: "Elbow", status: "Questionable", returnDate: "9/7/2025"},
+            "Eric Gray": { description: "Undisclosed", status: "PUP-R", returnDate: "10/5/2025"},
+            "C.J. Ham": { description: "Undisclosed", status: "IR-R", returnDate: "10/5/2025"},
+            "Najee Harris": { description: "Eye", status: "Questionable", returnDate: "9/5/2025"},
+            "Tre Harris": { description: "Undisclosed", status: "Questionable",	returnDate: "9/5/2025"},
+            "Taysom Hill": {description: "Knee - ACL",	status: "PUP-R", returnDate: "10/5/2025"},
+            "Tyreek Hill": { description: "Oblique", status: "Questionable", returnDate: "9/7/2025"},
+            "Travis Homer": { description: "Calf", status: "IR-R", returnDate: "10/13/2025"},
+            "DeAndre Hopkins": { description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Tory Horton": { description: "Ankle", status: "Questionable", returnDate: "9/7/2025"},
+            "Will Howard": { description: "Hand", status: "IR", returnDate: "10/12/2025"},
+            "Lamar Jackson": { description: "Foot", status: "Questionable",	returnDate: "9/7/2025"},
+            "Jordan James": { description: "Finger", status: "Questionable", returnDate: "9/7/2025"},
+            "Justin Jefferson": { description: "Hamstring", status: "Questionable",	returnDate: "9/8/2025"},
+            "Jauan Jennings": { description: "Calf", status: "Questionable", returnDate: "9/7/2025"},
+            "Roschon Johnson": { description: "Foot", status: "Questionable", returnDate: "9/8/2025"},
+            "Quentin Johnston": { description: "Concussion", status: "Questionable", returnDate: "9/5/2025"},
+            "Mac Jones": {description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Case Keenum": { description: "Leg", status: "Questionable", returnDate: "9/8/2025"},
+            "Allen Lazard": { description: "Shoulder", status: "Questionable", returnDate: "9/7/2025"},
+            "Isaiah Likely": { description: "Foot", status: "Questionable",	returnDate: "9/7/2025"},
+            "MarShawn Lloyd": { description: "Hamstring", status: "IR-R", returnDate: "10/12/2025"},
+            "Phil Mafah": { description: "Shoulder", status: "IR", returnDate: "10/5/2025"},
+            "Marcus Mariota": { description: "Lower Leg", status: "Questionable", returnDate: "9/7/2025"},
+            "Tanner McKee": { description: "Thumb", status: "Questionable",	returnDate: "9/4/2025"},
+            "Jalen McMillan": { description: "Neck", status: "IR-R", returnDate: "10/5/2025"},
+            "Tetairoa McMillan": { description: "Hamstring", status: "Questionable", returnDate: "9/7/2025"},
+            "Marvin Mims": { description: "Groin", status: "Questionable", returnDate: "9/7/2025"},
+            "Jonathan Mingo": { description: "Knee - PCL", status: "IR-R", returnDate: "10/5/2025"},
+            "Joe Mixon": { description: "Foot", status: "NFI-R", returnDate: "10/5/2025"},
+            "Kyle Monangai": { description: "Undisclosed", status: "Questionable", returnDate: "9/8/2025"},
+            "Darnell Mooney": { description: "Shoulder", status: "Questionable", returnDate: "9/7/2025"},
+            "Foster Moreau": { description: "Knee", status: "PUP-R", returnDate: "10/5/2025"},
+            "Kalel Mullings": { description: "Ankle", status: "Questionable", returnDate: "9/7/2025"},
+            "Malik Nabers": { description: "Back", status: "Questionable", returnDate: "9/7/2025"},
+            "Jalen Nailor": { description: "Hand", status: "Questionable", returnDate: "9/8/2025"},
+            "Aidan OConnell": { description: "Wrist", status: "IR", returnDate: "10/5/2025"},
+            "Cade Otton": {description: "Leg",  status: "Questionable",	returnDate: "9/7/2025"},
+            "Kenny Pickett": { description: "Hamstring", status: "Questionable", returnDate: "9/7/2025"},
+            "Jayden Reed": {description: "Foot", status: "Questionable", returnDate: "9/7/2025"},
+            "Patrick Ricard": { description: "Undisclosed", status: "Questionable",	returnDate: "9/7/2025"},
+            "Rashee Rice": {description: "Suspension",	status: "Reserve-Sus", returnDate: "10/19/2025"},
+            "Calvin Ridley": { description: "General Soreness",	status: "Questionable",	returnDate: "9/7/2025"},
+            "Demarcus Robinson": { description: "Suspension", status: "Reserve-Sus", returnDate: "9/28/2025"},
+            "Kurtis Rourke": { description: "Knee", status: "NFI-R", returnDate: "10/2/2025"},
+            "Jalen Royals": { description: "Knee", status: "Questionable", returnDate: "9/5/2025"},
+            "Drew Sample": { description: "Undisclosed", status: "Questionable", returnDate: "9/7/2025"},
+            "Curtis Samuel": { description: "Hamstring", status: "Questionable", returnDate: "9/7/2025"},
+            "Jason Sanders": { description: "Hip", status: "IR-R", returnDate: "10/5/2025"},
+            "Miles Sanders": { description: "Shoulder", status: "Questionable",	returnDate: "9/4/2025"},
+            "Luke Schoonmaker": { description: "Concussion", status: "Questionable", returnDate: "9/4/2025"},
+            "Zavier Scott": { description: "Ankle", status: "Questionable",	returnDate: "9/8/2025"},
+            "Khalil Shakir": { description: "Ankle", status: "Questionable", returnDate: "9/7/2025"},
+            "DeVonta Smith": { description: "Groin", status: "Questionable", returnDate: "9/4/2025"},
+            "Jonnu Smith": { description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Tyjae Spears": { description: "Ankle", status: "IR-R", returnDate: "10/5/2025"},
+            "John Stephens": { description: "Undisclosed", status: "IR", returnDate: "10/5/2025"},
+            "Rhamondre Stevenson": { description: "Undisclosed", status: "Questionable", returnDate: "9/7/2025"},
+            "Tyrod Taylor": { description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Tommy Tremble": { description: "Back", status: "Questionable",	returnDate: "9/7/2025"},
+            "Jordan Watkins": { description: "Ankle", status: "Questionable", returnDate: "9/7/2025"},
+            "Christian Watson": { description: "Knee - ACL", status: "PUP-R", returnDate: "10/12/2025"},
+            "Deshaun Watson": { description: "Achilles", status: "PUP-R", returnDate: "10/5/2025"},
+            "Rachaad White": { description: "Groin", status: "Questionable", returnDate: "9/7/2025"},
+            "Blake Whiteheart": { description: "Knee", status: "Questionable", returnDate: "9/7/2025"},
+            "Dontayvion Wicks": { description: "Calf", status: "Questionable", returnDate: "9/7/2025"},
+            "Kyle Williams": { description: "Undisclosed", status: "Questionable", returnDate: "9/7/2025"},
+            "Mike Williams": { description: "Undisclosed", status: "Reserve-Ex", returnDate: "9/5/2025"},
+            "Savion Williams": { description: "Hamstring", status: "Questionable", returnDate: "9/7/2025"},
+            "Jaylen Wright": { description: "Leg", status: "Doubtful", returnDate: "9/7/2025"}
+            
+            // Add more players as needed - this is just an example list
+            // You can update this object as injury news comes in
+        };
+
         // Debug logging function
         function debugLog(message) {
             console.log(message);
@@ -157,7 +264,8 @@
                             passTD: parseInt(columns[8]) || 0,
                             drafted: false,
                             draftedByMe: false,
-                            handcuff: handcuffData[playerName] || null
+                            handcuff: handcuffData[playerName] || null,
+                            injury: injuryData[playerName] || null
                         };
                         
                         players.push(player);
@@ -242,7 +350,7 @@
             if (players.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="14" style="text-align: center; padding: 40px;">
+                        <td colspan="15" style="text-align: center; padding: 40px;">
                             Please upload the CSV file to load player data
                         </td>
                     </tr>
@@ -259,12 +367,24 @@
                 } else if (player.drafted) {
                     row.className += ' drafted-by-others';
                 }
+                
+                // Add injury class if player is injured
+                if (player.injury) {
+                    row.className += ' player-injured';
+                }
 
                 const tierColors = {
                     1: '#ef4444', 2: '#f56565', 3: '#fb923c', 4: '#fbbf24',
                     5: '#22c55e', 6: '#3b82f6', 7: '#8b5cf6', 8: '#a855f7'
                 };
                 const tierColor = tierColors[player.tier] || '#6b7280';
+                
+                // Create injury status display
+                let injuryDisplay = '-';
+                if (player.injury) {
+                    const statusClass = `injury-${player.injury.status.toLowerCase().replace(' ', '-')}`;
+                    injuryDisplay = `<span class="injury-indicator ${statusClass}" title="${player.injury.description} - Return: ${player.injury.returnDate}">${player.injury.status}</span>`;
+                }
                 
                 row.innerHTML = `
                     <td><strong>#${player.rank}</strong></td>
@@ -273,6 +393,7 @@
                     <td><span class="position pos-${player.position.toLowerCase()}">${player.position}</span></td>
                     <td>${player.team}</td>
                     <td>${player.bye}</td>
+                    <td>${injuryDisplay}</td>
                     <td>${player.rushYds || '-'}</td>
                     <td>${player.rushTD || '-'}</td>
                     <td>${player.recYds || '-'}</td>
@@ -547,14 +668,20 @@
 
             // Check for injury concerns in top available
             const injuryConcerns = availablePlayers
-                .slice(0, 20)
-                .filter(p => p.tier <= 3)
-                .slice(0, 1);
+                .slice(0, 30) // Check top 30 available
+                .filter(p => p.injury) // Only players with injuries
+                .slice(0, 3); // Get up to 3 injured players
 
             const injuryElement = document.getElementById('injury-alert');
             if (injuryElement) {
-                injuryElement.textContent = injuryConcerns.length > 0 ?
-                    `${injuryConcerns[0].name} (Tier ${injuryConcerns[0].tier})` : 'None';
+                if (injuryConcerns.length > 0) {
+                    const injuryText = injuryConcerns
+                        .map(p => `${p.name} (${p.injury.status})`)
+                        .join(', ');
+                    injuryElement.textContent = injuryText;
+                } else {
+                    injuryElement.textContent = 'None in top available';
+                }
             }
         }
 
@@ -625,8 +752,9 @@
             debugMode = !debugMode;
             document.getElementById('debugInfo').style.display = debugMode ? 'block' : 'none';
             debugLog(`Debug mode ${debugMode ? 'enabled' : 'disabled'}`);
-        }</script>
-        <!DOCTYPE html>
+        }
+</script>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1016,6 +1144,40 @@
             border-left: 3px solid #8b5cf6;
         }
 
+        .injury-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .injury-ir {
+            background: #dc2626;
+            color: white;
+        }
+
+        .injury-suspended {
+            background: #ea580c;
+            color: white;
+        }
+
+        .injury-not-starting {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .injury-pup {
+            background: #7c3aed;
+            color: white;
+        }
+
+        .player-injured {
+            opacity: 0.8;
+            background: rgba(239, 68, 68, 0.05) !important;
+        }
+
         .file-input-wrapper {
             display: flex;
             gap: 10px;
@@ -1112,6 +1274,8 @@
             <button class="btn btn-secondary" onclick="toggleDebug()">🐛 Toggle Debug</button>
         </div>
 
+       
+
         <div class="stats-bar">
             <div class="stat-item">
                 <div class="stat-number" id="totalPlayers">0</div>
@@ -1134,6 +1298,7 @@
                 <div class="stat-label">Next Best Available</div>
             </div>
         </div>
+
 
         <!-- Smart Draft Assistant -->
         <div class="draft-assistant">
@@ -1216,6 +1381,7 @@
                         <th>Pos</th>
                         <th>Team</th>
                         <th>Bye</th>
+                        <th>Status</th>
                         <th>Rush Yds</th>
                         <th>Rush TD</th>
                         <th>Rec Yds</th>
