@@ -108,7 +108,6 @@
             };
             
             reader.readAsText(file);
-            document.getElementsByClassName('csv-upload-section').addCSS('display','none');
         }
 
         // Parse CSV content
@@ -618,7 +617,6 @@
                 updateByeWeekTracker();
                 updateDraftAssistant();
                 filterPlayers();
-                document.getElementsByClassName('csv-upload-section').addCSS('display','block');
             }
         }
 
@@ -1113,81 +1111,6 @@
             <button class="btn btn-secondary" onclick="toggleDebug()">🐛 Toggle Debug</button>
         </div>
 
-        <div class="controls">
-            <div class="control-group">
-                <label>Position Filter:</label>
-                <select id="positionFilter" onchange="filterPlayers()">
-                    <option value="all">All Positions</option>
-                    <option value="QB">QB</option>
-                    <option value="RB">RB</option>
-                    <option value="WR">WR</option>
-                    <option value="TE">TE</option>
-                    <option value="K">K</option>
-                    <option value="DST">DST</option>
-                </select>
-            </div>
-            
-            <div class="control-group">
-                <label>Team Filter:</label>
-                <select id="teamFilter" onchange="filterPlayers()">
-                    <option value="all">All Teams</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>Tier Filter:</label>
-                <select id="tierFilter" onchange="filterPlayers()">
-                    <option value="all">All Tiers</option>
-                    <option value="1">Tier 1</option>
-                    <option value="2">Tier 2</option>
-                    <option value="3">Tier 3</option>
-                    <option value="4">Tier 4</option>
-                    <option value="5">Tier 5</option>
-                    <option value="6">Tier 6</option>
-                    <option value="7">Tier 7</option>
-                    <option value="8">Tier 8</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>Show Drafted:</label>
-                <select id="draftedFilter" onchange="filterPlayers()">
-                    <option value="all">All Players</option>
-                    <option value="available">Available Only</option>
-                    <option value="my-team">My Team</option>
-                    <option value="others">Drafted by Others</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>Search Player:</label>
-                <input type="text" id="playerSearch" placeholder="Player name..." oninput="filterPlayers()">
-            </div>
-        </div>
-
-        <div class="stats-bar">
-            <div class="stat-item">
-                <div class="stat-number" id="totalPlayers">0</div>
-                <div class="stat-label">Total Players</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" id="availablePlayers">0</div>
-                <div class="stat-label">Available</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" id="myTeamPlayers">0</div>
-                <div class="stat-label">My Team</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" id="othersDrafted">0</div>
-                <div class="stat-label">Drafted by Others</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" id="topAvailable">--</div>
-                <div class="stat-label">Next Best Available</div>
-            </div>
-        </div>
-
         <!-- Roster Tracker -->
         <div class="roster-tracker">
             <h3>🏆 My Roster Tracker (1QB/2RB/2WR/1TE/2FLEX/1K/1DST + 7 Bench)</h3>
@@ -1276,6 +1199,81 @@
             </div>
         </div>
 
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-number" id="totalPlayers">0</div>
+                <div class="stat-label">Total Players</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="availablePlayers">0</div>
+                <div class="stat-label">Available</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="myTeamPlayers">0</div>
+                <div class="stat-label">My Team</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="othersDrafted">0</div>
+                <div class="stat-label">Drafted by Others</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="topAvailable">--</div>
+                <div class="stat-label">Next Best Available</div>
+            </div>
+        </div>
+        
+ <div class="controls">
+            <div class="control-group">
+                <label>Position Filter:</label>
+                <select id="positionFilter" onchange="filterPlayers()">
+                    <option value="all">All Positions</option>
+                    <option value="QB">QB</option>
+                    <option value="RB">RB</option>
+                    <option value="WR">WR</option>
+                    <option value="TE">TE</option>
+                    <option value="K">K</option>
+                    <option value="DST">DST</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Team Filter:</label>
+                <select id="teamFilter" onchange="filterPlayers()">
+                    <option value="all">All Teams</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Tier Filter:</label>
+                <select id="tierFilter" onchange="filterPlayers()">
+                    <option value="all">All Tiers</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                    <option value="5">Tier 5</option>
+                    <option value="6">Tier 6</option>
+                    <option value="7">Tier 7</option>
+                    <option value="8">Tier 8</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Show Drafted:</label>
+                <select id="draftedFilter" onchange="filterPlayers()">
+                    <option value="all">All Players</option>
+                    <option value="available">Available Only</option>
+                    <option value="my-team">My Team</option>
+                    <option value="others">Drafted by Others</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Search Player:</label>
+                <input type="text" id="playerSearch" placeholder="Player name..." oninput="filterPlayers()">
+            </div>
+        </div>
+        
         <div class="table-container">
             <table id="playersTable">
                 <thead>
