@@ -108,6 +108,7 @@
             };
             
             reader.readAsText(file);
+            document.getElementsByClassName('csv-upload-section').addCSS('display','none');
         }
 
         // Parse CSV content
@@ -617,6 +618,7 @@
                 updateByeWeekTracker();
                 updateDraftAssistant();
                 filterPlayers();
+                document.getElementsByClassName('csv-upload-section').addCSS('display','block');
             }
         }
 
